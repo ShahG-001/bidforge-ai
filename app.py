@@ -103,6 +103,23 @@ def metric_card(label: str, value: str, note: str) -> None:
     st.markdown(f'<div class="bf-card"><div class="bf-card-label">{label}</div><div class="bf-card-value">{value}</div><div class="bf-card-note">{note}</div></div>', unsafe_allow_html=True)
 
 
+def compact_tender_excerpt(text: str, limit: int = 7600) -> str:
+    """Keep an initial overview, requirement-bearing lines, and the closing portion."""
+    if len(text) <= limit:
+        return text
+    terms = ("deadline", "closing date", "submission", "eligibility", "evaluation", "scope", "deliverable", "mandatory", "bid security", "financial", "pricing", "technical", "clarification", "page limit", "penalty", "liability", "contract", "warranty", "key date")
+    selected = [text[:1700], "[Tender source excerpted to fit the model request budget]"]
+    used = sum(map(len, selected))
+    for line in text.splitlines():
+        if any(term in line.lower() for term in terms):
+            item = line.strip()[:260]
+            if item and item not in selected and used + len(item) + 1 < limit - 1200:
+                selected.append(item)
+                used += len(item) + 1
+    selected.append("[End of tender excerpt]\n" + text[-1000:])
+    return "\n".join(selected)
+
+
 st.markdown(
     '<div class="bf-hero"><div class="bf-eyebrow">Tender response workspace</div><h1>Turn complex tenders into structured bid drafts.</h1><p>Upload a tender, provide verified company evidence, and prepare a response with visible compliance gaps and review actions.</p><div class="bf-pills"><span class="bf-pill">Source-grounded</span><span class="bf-pill">Compliance-focused</span><span class="bf-pill">Human-reviewed</span></div></div>',
     unsafe_allow_html=True,
@@ -278,21 +295,22 @@ with tabs[3]:
             st.warning("Add a tender source in Tender Analysis first.")
         else:
             evidence_parts.extend("Saved verified evidence note\n" + item for item in st.session_state.bidforge_evidence)
-            price_grid = pricing_table.to_csv(index=False) if not pricing_table.empty else ""
-            materials = f"""TENDER SOURCE TEXT:\n{tender_text}
+            price_grid = pricing_table.to_csv(index=False)[:900] if not pricing_table.empty else ""
+            compact_tender = compact_tender_excerpt(tender_text)
+            materials = f"""TENDER SOURCE TEXT (selected overview and requirement-bearing excerpts):\n{compact_tender}
 
-VERIFIED COMPANY FACTS PROVIDED BY USER:\n{company_facts or '[Not provided]'}
+VERIFIED COMPANY FACTS PROVIDED BY USER:\n{company_facts[:1000] or '[Not provided]'}
 
 PRICING INPUTS FROM EDITABLE PRICE TABLE:\n{price_grid or '[None provided]'}
-ADDITIONAL PRICING INPUTS:\n{pricing_text or '[Not provided; do not estimate prices]'}
+ADDITIONAL PRICING INPUTS:\n{pricing_text[:600] or '[Not provided; do not estimate prices]'}
 
-REQUIRED TEMPLATE / FORMAT / LIMITS:\n{format_facts or '[Not provided]'}
+REQUIRED TEMPLATE / FORMAT / LIMITS:\n{format_facts[:500] or '[Not provided]'}
 
-COMPANY EVIDENCE AND SOURCES:\n{chr(10).join(evidence_parts) or '[None provided]'}
+COMPANY EVIDENCE AND SOURCES:\n{chr(10).join(evidence_parts)[:2200] or '[None provided]'}
 
 SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 'No extraction warnings.'}
 """
-            with st.spinner("Reading tender requirements and drafting selected sections…"):
+            with st.spinner("Reading tender requirements and drafting selected sections… If Groq rate-limits the request, BidForge will wait and retry once."):
                 try:
                     answer = draft_response(api_key, materials, get_memory(), chosen_sections)
                     st.session_state.bidforge_messages.append({"answer": answer, "sections": chosen_sections})
@@ -300,9 +318,13 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
                     add_to_memory("A response draft was generated. Verify claims and all placeholders against original tender sources.")
                     st.success("Draft ready for review.")
                 except Exception as error:
-                    st.error("AI service connection issue. BidForge could not complete this draft. Check Groq configuration and retry.")
+                    details = str(error)
+                    if "RateLimitError" in details or "rate_limit_exceeded" in details:
+                        st.warning("Groq is temporarily at its token-per-minute limit. BidForge waited and retried once, but the request still exceeded the current allowance. Wait briefly and try again with fewer sections selected.")
+                    else:
+                        st.error("AI service connection issue. BidForge could not complete this draft. Check Groq configuration and retry.")
                     with st.expander("Technical details"):
-                        st.code(str(error))
+                        st.code(details)
 
 with tabs[4]:
     st.markdown('<div class="bf-section">Compliance Matrix</div><div class="bf-sub">Trace requirements to their source and record the evidence or action needed.</div>', unsafe_allow_html=True)
