@@ -1,3 +1,6 @@
+import re
+import time
+
 from crewai import Agent, Crew, LLM, Process, Task
 import crewai.llms.cache as crewai_cache
 
@@ -20,7 +23,8 @@ def draft_response(api_key: str, user_material: str, session_memory: list[str], 
         model=MODEL,
         api_key=api_key,
         temperature=0.1,
-        max_tokens=12000,
+        # Keep the response within Groq's on-demand TPM budget more often.
+        max_tokens=2500,
     )
     agent = Agent(
         role="Tender Response Specialist",
@@ -57,4 +61,14 @@ SUPPLIED MATERIALS:\n{user_material}""",
         memory=False,
         verbose=False,
     )
-    return str(crew.kickoff())
+    for attempt in range(2):
+        try:
+            return str(crew.kickoff())
+        except Exception as error:
+            message = str(error)
+            is_rate_limit = "RateLimitError" in message or "rate_limit_exceeded" in message
+            if not is_rate_limit or attempt == 1:
+                raise
+            wait_match = re.search(r"try again in\s+(\d+)\s*s", message, flags=re.IGNORECASE)
+            wait_seconds = int(wait_match.group(1)) + 1 if wait_match else 15
+            time.sleep(min(max(wait_seconds, 5), 60))
