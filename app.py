@@ -77,6 +77,7 @@ st.markdown(
 for key, default in {
     "bidforge_memory": [], "bidforge_messages": [], "bidforge_evidence": [],
     "bidforge_compliance": None, "bidforge_pricing": pd.DataFrame(columns=["Resource", "Unit", "Rate", "Currency"]),
+    "bidforge_compliance_editing": False,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -336,14 +337,48 @@ with tabs[4]:
             matrix.insert(2, "Company evidence", "[TO BE PROVIDED / verify]")
         if "Response" not in matrix.columns:
             matrix.insert(3, "Response", "[AI draft — review]")
-        st.caption("AI Draft and Needs Review labels identify generated or unverified content. Use the editable fields to record human findings.")
-        edited = st.data_editor(matrix, num_rows="dynamic", use_container_width=True, key="compliance_matrix")
-        st.session_state.bidforge_compliance = edited
-        st.download_button("Export compliance matrix (CSV)", edited.to_csv(index=False), file_name="bidforge_compliance_matrix.csv", mime="text/csv", key="matrix_csv")
+        st.caption(f"{len(matrix)} requirement(s) · AI Draft and Needs Review labels identify unverified content.")
+        if not st.session_state.bidforge_compliance_editing:
+            st.dataframe(matrix, use_container_width=True, hide_index=True)
+            edit_col, export_col = st.columns([1, 1])
+            with edit_col:
+                if st.button("Edit compliance matrix", type="primary", key="start_matrix_edit"):
+                    st.session_state.bidforge_compliance_editing = True
+                    st.rerun()
+            with export_col:
+                st.download_button("Export compliance matrix (CSV)", matrix.to_csv(index=False), file_name="bidforge_compliance_matrix.csv", mime="text/csv", key="matrix_csv")
+        else:
+            st.info("Editing is on. Click a cell to change its value, then choose Save changes.")
+            edited = st.data_editor(
+                matrix,
+                num_rows="dynamic",
+                use_container_width=True,
+                hide_index=True,
+                key="compliance_matrix_editor",
+                column_config={
+                    "Status": st.column_config.SelectboxColumn(
+                        "Status",
+                        options=["Have it", "Need to prepare", "Missing info", "Compliant", "Partial", "Missing Evidence", "Needs Review"],
+                        help="Set this after checking the source and company evidence.",
+                    )
+                },
+            )
+            save_col, cancel_col, csv_col = st.columns([1, 1, 1])
+            with save_col:
+                if st.button("Save changes", type="primary", key="save_matrix_edit"):
+                    st.session_state.bidforge_compliance = edited
+                    st.session_state.bidforge_compliance_editing = False
+                    st.rerun()
+            with cancel_col:
+                if st.button("Cancel", key="cancel_matrix_edit"):
+                    st.session_state.bidforge_compliance_editing = False
+                    st.rerun()
+            with csv_col:
+                st.download_button("Export edited table (CSV)", edited.to_csv(index=False), file_name="bidforge_compliance_matrix.csv", mime="text/csv", key="matrix_csv_edit")
         with st.expander("Source evidence and extracted tender text"):
             st.text(tender_text[:25000] or "Tender text is not available in this session.")
     else:
-        st.info("Generate a draft with the Compliance checklist selected to populate the matrix.")
+        st.info("No compliance rows are available yet. Go to Bid Builder, select **Compliance checklist**, and generate a draft. The edit button will appear here once requirements are extracted.")
 
 with tabs[5]:
     st.markdown('<div class="bf-section">Bid Documents</div><div class="bf-sub">Drafts remain unapproved until reviewed by your bid team.</div>', unsafe_allow_html=True)
