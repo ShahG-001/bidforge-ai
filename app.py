@@ -23,11 +23,23 @@ st.markdown(
     <style>
       :root { --bf-blue:#2563eb; --bf-blue-dark:#1d4ed8; --bf-teal:#0f766e; --bf-ink:#111827; --bf-muted:#64748b; --bf-line:#e2e8f0; --bf-bg:#f6f8fc; }
       .stApp { background: radial-gradient(ellipse at 8% 0%, rgba(37,99,235,.055), transparent 34%), radial-gradient(ellipse at 92% 9%, rgba(15,118,110,.045), transparent 26%), #f7f9fc; color:var(--bf-ink); }
+      html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] { color:#111827 !important; color-scheme:light !important; }
       .block-container { max-width: 1440px; padding-top: 1.1rem; padding-bottom: 3rem; }
       [data-testid="stHeader"] { background:rgba(247,249,252,.85); }
       [data-testid="stSidebar"] { background:#fff; border-right:1px solid var(--bf-line); }
-      [data-testid="stTabs"] button { font-weight:600; }
-      [data-testid="stTabs"] button[aria-selected="true"] { color:var(--bf-blue-dark); }
+      [data-testid="stTabs"] button { font-weight:600; color:#475569 !important; opacity:1 !important; }
+      [data-testid="stTabs"] button p, [data-testid="stTabs"] button span { color:#475569 !important; opacity:1 !important; }
+      [data-testid="stTabs"] button[aria-selected="true"], [data-testid="stTabs"] button[aria-selected="true"] p, [data-testid="stTabs"] button[aria-selected="true"] span { color:#1d4ed8 !important; }
+      label, label p, [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] p { color:#334155 !important; opacity:1 !important; }
+      [data-testid="stMarkdownContainer"] p, [data-testid="stCaptionContainer"] p { color:#526174; }
+      input, textarea, [data-baseweb="input"] input, [data-baseweb="textarea"] textarea { background:#fff !important; color:#111827 !important; -webkit-text-fill-color:#111827 !important; border-color:#cbd5e1 !important; opacity:1 !important; }
+      input::placeholder, textarea::placeholder { color:#94a3b8 !important; -webkit-text-fill-color:#94a3b8 !important; opacity:1 !important; }
+      [data-baseweb="select"] > div { background:#fff !important; color:#111827 !important; border-color:#cbd5e1 !important; }
+      [data-testid="stFileUploaderDropzone"] { background:#fff !important; color:#334155 !important; border-color:#b9c8dc !important; }
+      [data-testid="stFileUploaderDropzone"] *, [data-testid="stFileUploaderDropzone"] button { color:#334155 !important; opacity:1 !important; }
+      [data-testid="stFileUploaderDropzone"] button { background:#fff !important; border:1px solid #cbd5e1 !important; }
+      [data-testid="stFileUploaderDropzone"] small { color:#64748b !important; }
+      [data-testid="stDataEditor"] { color:#111827 !important; }
       .bf-topbar { display:flex; align-items:center; justify-content:space-between; padding:.65rem 0 1rem; border-bottom:1px solid var(--bf-line); margin-bottom:1.35rem; }
       .bf-brand { display:flex; align-items:center; gap:.7rem; color:var(--bf-ink); font-size:1.13rem; font-weight:750; letter-spacing:-.02em; }
       .bf-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:11px; background:#eaf1ff; color:var(--bf-blue-dark); border:1px solid #d7e4ff; font-size:.8rem; font-weight:800; }
@@ -53,7 +65,7 @@ st.markdown(
       .bf-review-badge { display:inline-block; padding:.22rem .5rem; border-radius:6px; background:#fff2da; color:#a35b00; font-weight:650; font-size:.72rem; }
       div[data-testid="stButton"] button[kind="primary"] { background:var(--bf-blue); border-color:var(--bf-blue); border-radius:9px; font-weight:700; }
       div[data-testid="stButton"] button { border-radius:9px; }
-      div[data-testid="stFileUploader"] section { background:#fff; border:1px dashed #b9c8dc; border-radius:12px; }
+      div[data-testid="stFileUploader"] section { background:#fff !important; color:#334155 !important; border:1px dashed #b9c8dc; border-radius:12px; }
       [data-testid="stDataEditor"] { border:1px solid var(--bf-line); border-radius:10px; overflow:hidden; }
       @media(max-width:760px) { .bf-hero h1 {font-size:1.6rem;} .block-container {padding-left:1rem;padding-right:1rem;} }
     </style>
