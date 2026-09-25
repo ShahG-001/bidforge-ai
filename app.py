@@ -76,14 +76,38 @@ st.markdown(
 
 for key, default in {
     "bidforge_memory": [], "bidforge_messages": [], "bidforge_evidence": [],
-    "bidforge_compliance": None, "bidforge_pricing": pd.DataFrame(columns=["Resource", "Unit", "Rate", "Currency"]),
+    "bidforge_compliance": None, "bidforge_compliance_text": "", "bidforge_pricing": pd.DataFrame(columns=["Resource", "Unit", "Rate", "Currency"]),
     "bidforge_compliance_editing": False,
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
 
 
+def extract_markdown_section(markdown: str, word: str) -> str:
+    lines = markdown.splitlines()
+    start = None
+    start_level = 6
+    for index, line in enumerate(lines):
+        match = re.match(r"^(#{1,6})\s+(.+)$", line.strip())
+        if match and word.lower() in match.group(2).lower():
+            start = index + 1
+            start_level = len(match.group(1))
+            break
+    if start is None:
+        return ""
+    section = []
+    for line in lines[start:]:
+        match = re.match(r"^(#{1,6})\s+(.+)$", line.strip())
+        if match and len(match.group(1)) <= start_level:
+            break
+        section.append(line)
+    return "\n".join(section).strip()
+
+
 def extract_compliance_table(markdown: str) -> pd.DataFrame:
+    markdown = extract_markdown_section(markdown, "compliance")
+    if not markdown:
+        return pd.DataFrame(columns=["Requirement", "Source", "Status", "Evidence / next action", "Owner"])
     rows, in_table = [], False
     for line in markdown.splitlines():
         if line.strip().startswith("|"):
@@ -275,8 +299,10 @@ with tabs[3]:
     st.markdown("**Preparation progress**")
     st.progress(stage_progress, text="Draft generated — human review required" if stage_progress else "Waiting for tender and evidence")
     st.markdown("**BidForge agent workflow**")
-    if st.session_state.bidforge_messages:
-        st.success("Tender analyzed · Selected sections drafted · Compliance register ready for review")
+    if st.session_state.bidforge_messages and st.session_state.bidforge_compliance is not None and not st.session_state.bidforge_compliance.empty:
+        st.success("Draft generated · Compliance requirements extracted · Matrix ready for review")
+    elif st.session_state.bidforge_messages:
+        st.warning("Draft generated · Compliance checklist text is available below; the editable matrix could not be built from its format.")
     else:
         st.caption("Ready to read tender · Extract requirements · Match supplied company evidence · Draft selected sections")
     api_key = os.environ.get("GROQ_API_KEY")
@@ -315,6 +341,7 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
                 try:
                     answer = draft_response(api_key, materials, get_memory(), chosen_sections)
                     st.session_state.bidforge_messages.append({"answer": answer, "sections": chosen_sections})
+                    st.session_state.bidforge_compliance_text = extract_markdown_section(answer, "compliance")
                     st.session_state.bidforge_compliance = extract_compliance_table(answer)
                     add_to_memory("A response draft was generated. Verify claims and all placeholders against original tender sources.")
                     st.success("Draft ready for review.")
@@ -326,6 +353,16 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
                         st.error("AI service connection issue. BidForge could not complete this draft. Check Groq configuration and retry.")
                     with st.expander("Technical details"):
                         st.code(details)
+
+    if "Compliance checklist" in chosen_sections:
+        st.markdown("#### Compliance checklist")
+        compliance_text = st.session_state.get("bidforge_compliance_text", "")
+        if compliance_text:
+            st.markdown('<span class="bf-ai">AI DRAFT</span> &nbsp; <span class="bf-review-badge">NEEDS REVIEW</span>', unsafe_allow_html=True)
+            st.markdown(compliance_text)
+            st.caption("Compare each item with the source tender. Statuses and supporting evidence require human verification.")
+        elif st.session_state.bidforge_messages:
+            st.info("A compliance heading was not found in the last generated response. Generate again with Compliance checklist selected.")
 
 with tabs[4]:
     st.markdown('<div class="bf-section">Compliance Matrix</div><div class="bf-sub">Trace requirements to their source and record the evidence or action needed.</div>', unsafe_allow_html=True)
