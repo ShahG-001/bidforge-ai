@@ -1,6 +1,14 @@
 import os
+import sys
 
 import streamlit as st
+
+if sys.version_info >= (3, 14):
+    st.error(
+        "This app's CrewAI/ChromaDB dependency stack is not compatible with Python 3.14. "
+        "Redeploy it using Python 3.12 in Streamlit Community Cloud's Advanced settings."
+    )
+    st.stop()
 
 from bidforge.agent import draft_response
 from bidforge.document_reader import read_uploaded_file
