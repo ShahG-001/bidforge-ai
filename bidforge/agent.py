@@ -45,7 +45,7 @@ Prior notes saved for this browser session (context only; confirm against curren
 {RULES}
 
 Generate ONLY these selected sections (use exact headings): {', '.join(sections)}.
-For a compliance checklist, include a Markdown table with columns: Requirement | Source | Status | Evidence / next action | Owner.
+If Compliance checklist is selected, always include a section headed exactly '## Compliance checklist' and a Markdown table with columns: Requirement | Source | Status | Evidence / next action | Owner. Include every requirement found in the tender; if no evidence was provided, write [TO BE PROVIDED: evidence needed].
 For a financial bid, use provided prices only and create blanks if missing. For clarification questions, only ask about genuine ambiguity or missing tender information. For a review, identify unsupported claims, inconsistencies, unanswered requirements, and missing attachments. For readiness, state what is complete, outstanding, and due when.
 
 Start with source coverage and extraction limitations. Keep it precise and submission-oriented. Do not call it guaranteed compliant.
