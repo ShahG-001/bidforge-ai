@@ -1,89 +1,65 @@
 # BidForge AI
 
-Beginner-friendly tender response assistant built with **Streamlit + CrewAI + Groq**. One CrewAI agent uses two tools to scan tender requirements and check arithmetic for explicitly supplied prices. It uses Groq's `openai/gpt-oss-120b` model.
+BidForge AI is a single-agent tender response drafting app built with Streamlit, CrewAI, and Groq's `openai/gpt-oss-120b` model.
 
-## Project files
+## Included features
+
+- Upload a tender, paste its text, or import a public tender webpage/direct PDF link.
+- Add public company profile links, uploaded company evidence, templates, and verified company facts.
+- Preview extracted tender/company text before generation.
+- Select which sections to generate: tender analysis, compliance checklist, scope/clarifications, technical proposal, financial structure, supporting documents, readiness report, and quality review.
+- Edit the generated compliance table and download it as CSV.
+- Save company evidence notes for the current browser session and clear them when finished.
+- OCR scanned PDFs (first 30 pages), subject to OCR accuracy; verify the extracted text.
+- Download the response as Markdown, DOCX, or PDF.
+- Tool-assisted tender requirement scan and arithmetic check for complete supplied price rows.
+
+## Repository structure
 
 ```text
 bidforge-ai/
 ├── app.py
 ├── requirements.txt
+├── packages.txt
 └── bidforge/
     ├── __init__.py
     ├── agent.py
     ├── document_reader.py
+    ├── exports.py
     ├── memory.py
-    └── tools.py
+    ├── tools.py
+    └── web_reader.py
 ```
 
-## Step 1: Create the GitHub repository
+## GitHub and Streamlit Cloud setup
 
-1. Sign in at [GitHub](https://github.com/) and choose **New repository**.
-2. Name it `bidforge-ai`. Choose **Public** for the simplest Streamlit connection, or Private if you prefer; Streamlit must be authorized to access a private repository.
-3. Choose **Create repository**.
-
-## Step 2: Add files using GitHub's website
-
-You do not need to install anything on your computer. In the new repository, use **Add file → Create new file** for each file below. Enter the path in the filename box; GitHub creates the folder when the path includes `/`.
-
-Create these paths and paste in the matching code from this project:
-
-1. `app.py`
-2. `requirements.txt`
-3. `bidforge/__init__.py`
-4. `bidforge/agent.py`
-5. `bidforge/document_reader.py`
-6. `bidforge/memory.py`
-7. `bidforge/tools.py`
-
-For each file, select **Commit changes**. You may also upload the files with **Add file → Upload files** if you have them available on your device. Keep the folder paths shown above.
-
-## Step 3: Get a Groq API key
-
-1. Sign in to [Groq Console](https://console.groq.com/keys).
-2. Create an API key and copy it somewhere safe. Do not put it into a Python file or commit it to GitHub.
-
-## Step 4: Deploy on Streamlit Community Cloud
-
-1. Open [Streamlit Community Cloud](https://share.streamlit.io/) and sign in with GitHub.
-2. Authorize Streamlit to access the GitHub repository. For a private repository, grant the requested private-repository access.
-3. Choose **Create app**, then select your `bidforge-ai` repository, the `main` branch, and `app.py` as the app file.
-4. Open **Advanced settings** and select **Python 3.12**. This project uses CrewAI, which imports ChromaDB; the Python 3.14 / Pydantic v1 compatibility combination can fail during import.
-5. Add this secret, replacing the example with your actual Groq key:
+1. Create a GitHub repository called `bidforge-ai`.
+2. In GitHub, choose **Add file → Create new file**. Add each path above, pasting in the matching file from this project. Enter names such as `bidforge/agent.py` to create files in the `bidforge` folder. Commit each file. Keep `app.py`, `requirements.txt`, and `packages.txt` at the repository root.
+3. Create an API key in [Groq Console](https://console.groq.com/keys). Keep the key secret and do not put it in the repository.
+4. Go to [Streamlit Community Cloud](https://share.streamlit.io/) and create an app from the GitHub repository. Choose the `main` branch and `app.py` entry point.
+5. In **Advanced settings**, choose **Python 3.12**. If the existing deployment uses Python 3.14, save its Groq key and delete/recreate the Streamlit app to choose Python 3.12; the GitHub repository itself stays intact.
+6. Add the following in the deployment **Secrets** field:
 
    ```toml
-   GROQ_API_KEY = "paste-your-real-key-here"
+   GROQ_API_KEY = "your-real-groq-api-key"
    ```
 
-6. Click **Deploy**. Streamlit installs packages from `requirements.txt` and starts the app. Future commits to the selected GitHub branch trigger app updates.
+7. Deploy. Streamlit installs Python dependencies from `requirements.txt` and system packages from `packages.txt`. New commits to the selected GitHub branch trigger redeployment.
 
-### If the existing app already uses Python 3.14
+## Public link import
 
-Streamlit Community Cloud does not let you change an app's Python version after deployment. Save the Groq secret, delete the **deployed app** from Streamlit (this does not delete your GitHub repository), then create/deploy the app again and select Python 3.12 in **Advanced settings**. Re-enter the `GROQ_API_KEY` secret when prompted. See [Streamlit's Python version instructions](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/upgrade-python).
-
-## Step 5: Use the app
-
-1. Upload a text-based PDF, DOCX, TXT, or Markdown tender, or paste the tender text.
-2. Add company facts, supporting documents, and any bid pricing or formatting instructions.
-3. Click **Create response package** and review the generated checklist and draft.
-4. Download the response as Markdown. Verify all details against the original tender before submission.
-
-## Tools included
-
-- **Tender requirement scanner:** finds lines mentioning common tender topics such as submission deadlines, eligibility, evaluation, bid security, and legal terms. It only searches the text you provide; it does not browse the web.
-- **Pricing arithmetic checker:** multiplies supplied quantity and unit-price pairs. It will not supply missing prices, taxes, or fees.
+The app fetches publicly accessible HTTP(S) pages and direct PDF links, up to 5 MB per link. It does not sign in to sites, follow redirects, or access private/internal network addresses. If the site blocks automated requests, paste the relevant text or upload the file. Review the extracted preview before generating a draft. Webpage content is reference material, not proof that company claims are valid.
 
 ## Memory and privacy
 
-This starter has short-term memory for the current Streamlit browser session: it can use notes you save during that session and you can clear them in the sidebar. Conversation continuity resets when the session ends, the app restarts, or you open a new session. This avoids pretending that Streamlit's temporary app filesystem is a permanent database. The starter does **not** keep company facts between visits. For cross-session, multi-user memory, add a managed database (for example, Supabase) with user authentication and access controls before storing confidential tender or company data.
+Saved evidence and memory are limited to the current Streamlit browser session. They are cleared when the session ends or the app restarts. For long-term or multi-user storage, add a managed database and authentication before storing confidential data. Uploaded text and imported link text are sent to Groq when you generate a response. Use only sources your organization permits you to process this way.
 
-The app sends the text you submit to Groq to generate the response. Do not upload sensitive documents unless your organization approves that processing.
+## Important safeguards
 
-## Important limitations
-
-- Never treat generated output as guaranteed compliant. Have a person review every requirement and response.
-- Missing company facts and prices should remain `[TO BE PROVIDED]`; the model must not invent qualifications or evidence.
-- The app flags legal clauses for human/legal review and does not provide legal advice.
-- Scanned PDFs with no selectable text may not work. Convert them to searchable PDF or paste the relevant text.
-- Bid bonds, signed declarations, original/certified certificates, and notarized documents must be obtained from their proper issuers; the app only lists them.
-- `GROQ_API_KEY` must remain in Streamlit Secrets. If a key is ever committed to GitHub, revoke it and create a new one.
+- The agent must not invent credentials, references, personnel, dates, or prices. Missing bidder inputs should remain `[TO BE PROVIDED]`.
+- Public company pages may be outdated or promotional. Verify all extracted claims and upload authoritative supporting documents.
+- OCR can misread scanned pages; check the extracted source preview and original documents.
+- DOCX/PDF exports provide a basic text layout. They do not reproduce an issuer's exact template design or guarantee page limits. Review and format against the actual tender requirements before submission.
+- Bid bonds, original/certified/notarized certificates, and signed declarations must be obtained from their issuers. The app can checklist them only.
+- Legal/contractual clauses are flagged for human/legal review; the app does not provide legal advice.
+- Output is a draft, not a guarantee of compliance.
