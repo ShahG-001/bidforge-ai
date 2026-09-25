@@ -2,6 +2,8 @@
 
 BidForge AI is a single-agent tender response drafting app built with Streamlit, CrewAI, and Groq's `openai/gpt-oss-120b` model.
 
+The workspace is organized into Dashboard, Tender Analysis, Company Evidence, Bid Builder, Compliance, and Documents tabs. Its light enterprise styling distinguishes source evidence, user input, AI drafts, and items that still need review.
+
 ## Included features
 
 - Upload a tender, paste its text, or import a public tender webpage/direct PDF link.
@@ -21,6 +23,8 @@ bidforge-ai/
 ├── app.py
 ├── requirements.txt
 ├── packages.txt
+├── .streamlit/
+│   └── config.toml
 └── bidforge/
     ├── __init__.py
     ├── agent.py
