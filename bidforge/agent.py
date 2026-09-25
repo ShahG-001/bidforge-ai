@@ -1,6 +1,13 @@
 from crewai import Agent, Crew, LLM, Process, Task
+import crewai.llms.cache as crewai_cache
 
 from bidforge.tools import check_pricing_arithmetic, scan_tender_requirements
+
+
+# CrewAI currently adds a cache_breakpoint field to system messages for every
+# provider. Anthropic accepts it, but Groq rejects it. Disable that marker for
+# this app's Groq requests so CrewAI sends a valid message payload.
+crewai_cache.mark_cache_breakpoint = lambda message: message
 
 
 MODEL = "groq/openai/gpt-oss-120b"
