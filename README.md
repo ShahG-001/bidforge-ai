@@ -1,4 +1,3 @@
-# bidforge-ai
 # BidForge AI
 
 Beginner-friendly tender response assistant built with **Streamlit + CrewAI + Groq**. One CrewAI agent uses two tools to scan tender requirements and check arithmetic for explicitly supplied prices. It uses Groq's `openai/gpt-oss-120b` model.
@@ -49,7 +48,7 @@ For each file, select **Commit changes**. You may also upload the files with **A
 1. Open [Streamlit Community Cloud](https://share.streamlit.io/) and sign in with GitHub.
 2. Authorize Streamlit to access the GitHub repository. For a private repository, grant the requested private-repository access.
 3. Choose **Create app**, then select your `bidforge-ai` repository, the `main` branch, and `app.py` as the app file.
-4. Open **Advanced settings** (or deploy first and then open the app's **Settings → Secrets**).
+4. Open **Advanced settings** and select **Python 3.12**. This project uses CrewAI, which imports ChromaDB; the Python 3.14 / Pydantic v1 compatibility combination can fail during import.
 5. Add this secret, replacing the example with your actual Groq key:
 
    ```toml
@@ -57,6 +56,10 @@ For each file, select **Commit changes**. You may also upload the files with **A
    ```
 
 6. Click **Deploy**. Streamlit installs packages from `requirements.txt` and starts the app. Future commits to the selected GitHub branch trigger app updates.
+
+### If the existing app already uses Python 3.14
+
+Streamlit Community Cloud does not let you change an app's Python version after deployment. Save the Groq secret, delete the **deployed app** from Streamlit (this does not delete your GitHub repository), then create/deploy the app again and select Python 3.12 in **Advanced settings**. Re-enter the `GROQ_API_KEY` secret when prompted. See [Streamlit's Python version instructions](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app/upgrade-python).
 
 ## Step 5: Use the app
 
