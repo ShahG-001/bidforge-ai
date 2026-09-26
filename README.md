@@ -18,7 +18,9 @@ The workspace is organized into Dashboard, Tender Analysis, Company Evidence, Bi
 - See a formatted preview alongside the draft editor; DOCX/PDF exports render Markdown tables as aligned tables.
 - PDF and DOCX source text includes page or paragraph markers when available; compliance rows request tender excerpts and company evidence references, with a per-requirement source inspector in the Compliance tab.
 - Tool-assisted tender requirement scan and arithmetic check for complete supplied price rows.
-- Rate-limit handling: request context is compacted, output length is bounded, and the app waits/retries once when Groq reports a token-per-minute limit.
+- Long-tender workflow: tenders over 10,000 characters are analyzed in source-marked sections, with visible progress and an explicit warning if the section limit leaves content unreviewed.
+- Optional on-demand evidence and claim audit in Documents compares draft statements with the tender/company material saved for that draft. It consumes Groq tokens only when requested and must be checked by a person.
+- Rate-limit handling: request context is compacted, output length is bounded, and the app honors Groq's suggested wait while progressively lowering the response token budget on TPM retries.
 
 ## Repository structure
 
@@ -29,6 +31,8 @@ bidforge-ai/
 ├── packages.txt
 ├── .streamlit/
 │   └── config.toml
+├── assets/
+│   └── bidforge-logo.png
 └── bidforge/
     ├── __init__.py
     ├── agent.py
@@ -42,7 +46,7 @@ bidforge-ai/
 ## GitHub and Streamlit Cloud setup
 
 1. Create a GitHub repository called `bidforge-ai`.
-2. In GitHub, choose **Add file → Create new file**. Add each path above, pasting in the matching file from this project. Enter names such as `bidforge/agent.py` to create files in the `bidforge` folder. Commit each file. Keep `app.py`, `requirements.txt`, and `packages.txt` at the repository root.
+2. In GitHub, choose **Add file → Create new file**. Add each path above, pasting in the matching file from this project. Enter names such as `bidforge/agent.py` to create files in the `bidforge` folder. Upload `assets/bidforge-logo.png` with **Add file → Upload files** so the logo stays a binary PNG. Commit each file. Keep `app.py`, `requirements.txt`, and `packages.txt` at the repository root.
 3. Create an API key in [Groq Console](https://console.groq.com/keys). Keep the key secret and do not put it in the repository.
 4. Go to [Streamlit Community Cloud](https://share.streamlit.io/) and create an app from the GitHub repository. Choose the `main` branch and `app.py` entry point.
 5. In **Advanced settings**, choose **Python 3.12**. If the existing deployment uses Python 3.14, save its Groq key and delete/recreate the Streamlit app to choose Python 3.12; the GitHub repository itself stays intact.
