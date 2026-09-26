@@ -52,7 +52,11 @@ def fetch_public_text(url: str) -> tuple[str, str]:
         from io import BytesIO
         from pypdf import PdfReader
 
-        text = "\n\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(data)).pages)
+        pages = PdfReader(BytesIO(data)).pages
+        text = "\n\n".join(
+            f"[SOURCE: {safe_url} | PAGE {index}]\n{page.extract_text() or ''}"
+            for index, page in enumerate(pages, start=1)
+        )
         return text, "" if text.strip() else "No selectable PDF text was found; upload a searchable PDF instead."
     if "html" not in content_type and "text/" not in content_type:
         return "", f"Unsupported link content type: {content_type or 'unknown'}. Use a public webpage or PDF link."
@@ -61,4 +65,4 @@ def fetch_public_text(url: str) -> tuple[str, str]:
         tag.decompose()
     text = "\n".join(line.strip() for line in soup.get_text("\n").splitlines() if line.strip())
     title = soup.title.get_text(" ", strip=True) if soup.title else safe_url
-    return f"Source title: {title}\nSource URL: {safe_url}\n\n{text[:100000]}", "" if text.strip() else "No readable page text was found."
+    return f"[SOURCE: {title} | {safe_url}]\n\n{text[:100000]}", "" if text.strip() else "No readable page text was found."
