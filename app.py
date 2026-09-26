@@ -10,6 +10,11 @@ import streamlit as st
 
 LOGO_PATH = Path(__file__).parent / "assets" / "bidforge-logo.png"
 LOGO_BASE64 = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii") if LOGO_PATH.exists() else ""
+LOGO_MARKUP = (
+    f'<img class="bf-logo" src="data:image/png;base64,{LOGO_BASE64}" alt="BidForge AI logo">'
+    if LOGO_BASE64
+    else '<span class="bf-brand-fallback">BidForge <span>AI</span></span>'
+)
 
 st.set_page_config(page_title="BidForge AI | Tender Workspace", page_icon=str(LOGO_PATH) if LOGO_PATH.exists() else "📑", layout="wide")
 
@@ -59,6 +64,8 @@ st.markdown(
       .bf-topbar { display:flex; align-items:center; justify-content:space-between; padding:.65rem 0 1rem; border-bottom:1px solid var(--bf-line); margin-bottom:1.35rem; }
       .bf-brand { display:flex; align-items:center; gap:.7rem; color:var(--bf-ink); font-size:1.13rem; font-weight:750; letter-spacing:-.02em; }
       .bf-logo { display:block; width:220px; height:70px; object-fit:contain; object-position:left center; }
+      .bf-brand-fallback { color:#102a56; font-size:1.45rem; font-weight:800; letter-spacing:-.04em; }
+      .bf-brand-fallback span { color:#0f9f91; }
       .bf-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:11px; background:#eaf1ff; color:var(--bf-blue-dark); border:1px solid #d7e4ff; font-size:.8rem; font-weight:800; }
       .bf-state { color:#475569; background:#fff; border:1px solid var(--bf-line); padding:.4rem .7rem; border-radius:999px; font-size:.78rem; }
       .bf-hero { background:linear-gradient(112deg,rgba(255,255,255,.97) 0%,rgba(245,248,255,.96) 66%,rgba(239,250,248,.96) 100%); border:1px solid #dce6f3; border-radius:20px; padding:1.8rem 2rem; box-shadow:0 12px 32px rgba(30,64,110,.065); }
@@ -94,7 +101,7 @@ st.markdown(
       .bf-source-preview { white-space:pre-wrap; overflow-wrap:anywhere; max-height:430px; overflow:auto; padding:1rem 1.1rem; background:#fff; border:1px solid #dce4ef; border-radius:12px; color:#334155; font-family:Inter,Manrope,Arial,sans-serif; font-size:.88rem; line-height:1.62; box-shadow:0 3px 12px rgba(15,23,42,.025); }
       @media(max-width:760px) { .bf-hero h1 {font-size:1.6rem;} .block-container {padding-left:1rem;padding-right:1rem;} .bf-logo {width:165px;height:56px;} .bf-state {font-size:.68rem;padding:.3rem .48rem;} }
     </style>
-    <div class="bf-topbar"><div class="bf-brand"><img class="bf-logo" src="data:image/png;base64,""" + LOGO_BASE64 + """ alt="BidForge AI logo"></div><div class="bf-state">● Session active &nbsp;·&nbsp; Groq / GPT-OSS-120B</div></div>
+    <div class="bf-topbar"><div class="bf-brand">""" + LOGO_MARKUP + """</div><div class="bf-state">● Session active &nbsp;·&nbsp; Groq / GPT-OSS-120B</div></div>
     """,
     unsafe_allow_html=True,
 )
