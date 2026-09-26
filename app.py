@@ -17,7 +17,7 @@ if sys.version_info >= (3, 14):
     st.error("Please redeploy BidForge AI using Python 3.12 in Streamlit Community Cloud.")
     st.stop()
 
-from bidforge.agent import draft_response
+from bidforge.agent import analyze_long_tender, audit_draft_claims, draft_response
 from bidforge.document_reader import read_uploaded_file
 from bidforge.exports import to_docx, to_pdf
 from bidforge.memory import add_to_memory, get_memory, reset_memory
@@ -369,8 +369,25 @@ with tabs[3]:
         else:
             evidence_parts.extend("Saved verified evidence note\n" + item for item in st.session_state.bidforge_evidence)
             price_grid = pricing_table.to_csv(index=False)[:900] if not pricing_table.empty else ""
-            compact_tender = compact_tender_excerpt(tender_text)
-            materials = f"""TENDER SOURCE TEXT (selected overview and requirement-bearing excerpts):\n{compact_tender}
+            coverage = {"long_tender": len(tender_text) > 10000, "chunks": 0, "omitted": 0}
+            if coverage["long_tender"]:
+                try:
+                    with st.status("Analyzing tender section by section…", expanded=True) as analysis_status:
+                        progress_bar = st.progress(0, text="Preparing source sections")
+                        def show_chunk_progress(done, total):
+                            progress_bar.progress(done / total, text=f"Reviewed tender section {done} of {total}")
+                        tender_for_prompt, chunk_count, omitted_chunks = analyze_long_tender(api_key, tender_text, show_chunk_progress)
+                        coverage.update({"chunks": chunk_count, "omitted": omitted_chunks})
+                        analysis_status.update(label="Tender section analysis complete", state="complete")
+                except Exception as error:
+                    st.error("BidForge could not finish the long-tender analysis. Check the Groq connection or rate limit, then retry.")
+                    with st.expander("Technical details"):
+                        st.code(str(error))
+                    st.stop()
+            else:
+                tender_for_prompt = compact_tender_excerpt(tender_text)
+            tender_label = "Section-by-section analysis notes" if coverage["long_tender"] else "Concise overview and requirement-bearing excerpts"
+            materials = f"""TENDER SOURCE TEXT ({tender_label}):\n{tender_for_prompt}
 
 VERIFIED COMPANY FACTS PROVIDED BY USER:\n{company_facts[:1000] or '[Not provided]'}
 
@@ -386,7 +403,7 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
             with st.spinner("Reading tender requirements and drafting selected sections… If Groq rate-limits the request, BidForge will wait and retry once."):
                 try:
                     answer = draft_response(api_key, materials, get_memory(), chosen_sections)
-                    st.session_state.bidforge_messages.append({"answer": answer, "edited_answer": answer, "sections": chosen_sections})
+                    st.session_state.bidforge_messages.append({"answer": answer, "edited_answer": answer, "sections": chosen_sections, "source_material": materials, "analysis_coverage": coverage})
                     st.session_state.bidforge_compliance_text = extract_markdown_section(answer, "compliance")
                     st.session_state.bidforge_compliance = extract_compliance_table(answer)
                     add_to_memory("A response draft was generated. Verify claims and all placeholders against original tender sources.")
@@ -399,6 +416,15 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
                         st.error("AI service connection issue. BidForge could not complete this draft. Check Groq configuration and retry.")
                     with st.expander("Technical details"):
                         st.code(details)
+
+    if st.session_state.bidforge_messages:
+        coverage = st.session_state.bidforge_messages[-1].get("analysis_coverage", {})
+        if coverage.get("long_tender"):
+            st.info(f"Long-tender analysis reviewed {coverage.get('chunks', 0)} section(s) before drafting.")
+            if coverage.get("omitted", 0):
+                st.warning(f"Coverage is partial: {coverage['omitted']} additional section(s) exceeded the analysis limit. Review those sections manually in the original tender.")
+        else:
+            st.caption("Short tender processed with a concise source excerpt. Check the original tender for requirements that were not captured.")
 
     if "Compliance checklist" in chosen_sections:
         st.markdown("#### Compliance checklist")
@@ -508,6 +534,7 @@ with tabs[5]:
                 with save_col:
                     if st.button("Save edits", type="primary", key=f"save_draft_{draft_id}"):
                         st.session_state.bidforge_messages[draft_id]["edited_answer"] = edited_text
+                        st.session_state.bidforge_messages[draft_id].pop("claim_audit", None)
                         st.session_state.bidforge_editing_draft = None
                         st.rerun()
                 with cancel_col:
@@ -517,6 +544,7 @@ with tabs[5]:
                 with restore_col:
                     if is_edited and st.button("Restore AI draft", key=f"restore_draft_{draft_id}"):
                         st.session_state.bidforge_messages[draft_id]["edited_answer"] = original_text
+                        st.session_state.bidforge_messages[draft_id].pop("claim_audit", None)
                         st.session_state.bidforge_editing_draft = None
                         st.rerun()
             else:
@@ -529,7 +557,24 @@ with tabs[5]:
                 with restore_col:
                     if is_edited and st.button("Restore original AI draft", key=f"restore_original_{draft_id}"):
                         st.session_state.bidforge_messages[draft_id]["edited_answer"] = original_text
+                        st.session_state.bidforge_messages[draft_id].pop("claim_audit", None)
                         st.rerun()
+            if st.button("Run / refresh evidence and claim audit", key=f"audit_draft_{draft_id}"):
+                if not message.get("source_material"):
+                    st.warning("This saved draft does not include its source package. Generate a new draft to enable auditing.")
+                else:
+                    try:
+                        with st.spinner("Checking draft claims against the evidence supplied for this bid…"):
+                            message["claim_audit"] = audit_draft_claims(api_key, saved_text, message["source_material"])
+                    except Exception as error:
+                        st.error("Could not complete the claim audit. Check the Groq connection and retry.")
+                        with st.expander("Technical details"):
+                            st.code(str(error))
+            if message.get("claim_audit"):
+                st.markdown("#### Evidence and claim audit")
+                st.markdown('<span class="bf-ai">AI AUDIT</span> &nbsp; <span class="bf-review-badge">NEEDS HUMAN REVIEW</span>', unsafe_allow_html=True)
+                st.markdown(message["claim_audit"])
+                st.caption("The audit checks only the source package saved with this draft. Unsupported means no evidence was supplied here; verify against authoritative records.")
             download_text = saved_text
             left, middle, right = st.columns(3)
             with left:
