@@ -14,7 +14,11 @@ The workspace is organized into Dashboard, Tender Analysis, Company Evidence, Bi
 - Save company evidence notes for the current browser session and clear them when finished.
 - OCR scanned PDFs (first 30 pages), subject to OCR accuracy; verify the extracted text.
 - Download the response as Markdown, DOCX, or PDF.
+- Edit generated response drafts in the Documents tab, save edits for the current browser session, restore the original AI text, and download the edited version.
+- See a formatted preview alongside the draft editor; DOCX/PDF exports render Markdown tables as aligned tables.
+- PDF and DOCX source text includes page or paragraph markers when available; compliance rows request tender excerpts and company evidence references, with a per-requirement source inspector in the Compliance tab.
 - Tool-assisted tender requirement scan and arithmetic check for complete supplied price rows.
+- Rate-limit handling: request context is compacted, output length is bounded, and the app waits/retries once when Groq reports a token-per-minute limit.
 
 ## Repository structure
 
