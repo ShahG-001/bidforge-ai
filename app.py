@@ -340,7 +340,7 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
             with st.spinner("Reading tender requirements and drafting selected sections… If Groq rate-limits the request, BidForge will wait and retry once."):
                 try:
                     answer = draft_response(api_key, materials, get_memory(), chosen_sections)
-                    st.session_state.bidforge_messages.append({"answer": answer, "sections": chosen_sections})
+                    st.session_state.bidforge_messages.append({"answer": answer, "edited_answer": answer, "sections": chosen_sections})
                     st.session_state.bidforge_compliance_text = extract_markdown_section(answer, "compliance")
                     st.session_state.bidforge_compliance = extract_compliance_table(answer)
                     add_to_memory("A response draft was generated. Verify claims and all placeholders against original tender sources.")
@@ -418,25 +418,62 @@ with tabs[4]:
         st.info("No compliance rows are available yet. Go to Bid Builder, select **Compliance checklist**, and generate a draft. The edit button will appear here once requirements are extracted.")
 
 with tabs[5]:
-    st.markdown('<div class="bf-section">Bid Documents</div><div class="bf-sub">Drafts remain unapproved until reviewed by your bid team.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="bf-section">Bid Documents</div><div class="bf-sub">Edit generated text in the app, save your changes for this session, and download the edited version.</div>', unsafe_allow_html=True)
+    st.caption("Draft edits are session-only. Editing a document does not automatically change the separate compliance matrix.")
     if not st.session_state.bidforge_messages:
         st.info("Generated response documents will appear here.")
     for index, message in enumerate(reversed(st.session_state.bidforge_messages), start=1):
-        st.markdown(f'<div class="bf-card"><div class="bf-card-label">Response package · Draft {len(st.session_state.bidforge_messages) - index + 1}</div><div class="bf-card-value" style="font-size:1.1rem">Selected tender sections</div><div class="bf-card-note">{", ".join(message["sections"])} · <span style="color:#a35b00">Needs review</span></div></div>', unsafe_allow_html=True)
+        draft_id = len(st.session_state.bidforge_messages) - index
+        draft_number = draft_id + 1
+        original_text = message["answer"]
+        saved_text = message.get("edited_answer", original_text)
+        is_edited = saved_text != original_text
+        is_editing = st.session_state.get("bidforge_editing_draft") == draft_id
+        version_label = "Edited draft" if is_edited else "AI draft"
+        st.markdown(f'<div class="bf-card"><div class="bf-card-label">Response package · Draft {draft_number}</div><div class="bf-card-value" style="font-size:1.1rem">{version_label}</div><div class="bf-card-note">{", ".join(message["sections"])} · <span style="color:#a35b00">Needs review</span></div></div>', unsafe_allow_html=True)
         with st.expander("Preview draft", expanded=index == 1):
-            st.markdown('<span class="bf-ai">AI DRAFT</span> &nbsp; <span class="bf-review-badge">NEEDS REVIEW</span>', unsafe_allow_html=True)
-            st.markdown(message["answer"])
+            st.markdown('<span class="bf-ai">AI DRAFT</span> &nbsp; <span class="bf-review-badge">NEEDS REVIEW</span>' + (' &nbsp; <span class="bf-user">USER EDITED</span>' if is_edited else ''), unsafe_allow_html=True)
+            if is_editing:
+                st.caption("Edit the response text below. Markdown headings and lists can be retained. Your changes are saved for this browser session.")
+                edited_text = st.text_area("Edit response draft", value=saved_text, height=520, key=f"draft_editor_{draft_id}", label_visibility="collapsed")
+                save_col, cancel_col, restore_col = st.columns(3)
+                with save_col:
+                    if st.button("Save edits", type="primary", key=f"save_draft_{draft_id}"):
+                        st.session_state.bidforge_messages[draft_id]["edited_answer"] = edited_text
+                        st.session_state.bidforge_editing_draft = None
+                        st.rerun()
+                with cancel_col:
+                    if st.button("Cancel editing", key=f"cancel_draft_{draft_id}"):
+                        st.session_state.bidforge_editing_draft = None
+                        st.rerun()
+                with restore_col:
+                    if is_edited and st.button("Restore AI draft", key=f"restore_draft_{draft_id}"):
+                        st.session_state.bidforge_messages[draft_id]["edited_answer"] = original_text
+                        st.session_state.bidforge_editing_draft = None
+                        st.rerun()
+            else:
+                st.markdown(saved_text)
+                edit_col, restore_col = st.columns([1, 1])
+                with edit_col:
+                    if st.button("Edit draft", type="primary", key=f"edit_draft_{draft_id}"):
+                        st.session_state.bidforge_editing_draft = draft_id
+                        st.rerun()
+                with restore_col:
+                    if is_edited and st.button("Restore original AI draft", key=f"restore_original_{draft_id}"):
+                        st.session_state.bidforge_messages[draft_id]["edited_answer"] = original_text
+                        st.rerun()
+            download_text = saved_text
             left, middle, right = st.columns(3)
             with left:
-                st.download_button("Download Markdown", message["answer"], file_name=f"bidforge_response_{index}.md", mime="text/markdown", key=f"md_{index}")
+                st.download_button("Download Markdown", download_text, file_name=f"bidforge_response_{draft_number}.md", mime="text/markdown", key=f"md_{draft_id}")
             with middle:
                 try:
-                    st.download_button("Download DOCX", to_docx(message["answer"]), file_name=f"bidforge_response_{index}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"docx_{index}")
+                    st.download_button("Download DOCX", to_docx(download_text), file_name=f"bidforge_response_{draft_number}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", key=f"docx_{draft_id}")
                 except Exception as error:
                     st.error(f"DOCX export unavailable: {error}")
             with right:
                 try:
-                    st.download_button("Download PDF", to_pdf(message["answer"]), file_name=f"bidforge_response_{index}.pdf", mime="application/pdf", key=f"pdf_{index}")
+                    st.download_button("Download PDF", to_pdf(download_text), file_name=f"bidforge_response_{draft_number}.pdf", mime="application/pdf", key=f"pdf_{draft_id}")
                 except Exception as error:
                     st.error(f"PDF export unavailable: {error}")
 
