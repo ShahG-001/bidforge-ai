@@ -19,9 +19,10 @@ RULES = """Never invent company facts, tender requirements, certificates, qualif
 
 
 def _run_task(api_key: str, description: str, expected_output: str, max_tokens: int = 2200, tools=None, role: str = "Tender Response Specialist") -> str:
-    """Run one CrewAI task and retry Groq TPM limits using a fresh crew instance."""
-    for attempt in range(3):
-        llm = LLM(model=MODEL, api_key=api_key, temperature=0.1, max_tokens=max_tokens)
+    """Run a task, honoring Groq's retry delay and lowering output budget on TPM errors."""
+    current_max_tokens = max_tokens
+    for attempt in range(4):
+        llm = LLM(model=MODEL, api_key=api_key, temperature=0.1, max_tokens=current_max_tokens)
         agent = Agent(
             role=role,
             goal="Analyze tender materials and produce precise, evidence-grounded results.",
@@ -38,11 +39,14 @@ def _run_task(api_key: str, description: str, expected_output: str, max_tokens: 
         except Exception as error:
             message = str(error)
             is_rate_limit = "RateLimitError" in message or "rate_limit_exceeded" in message
-            if not is_rate_limit or attempt == 2:
+            if not is_rate_limit or attempt == 3:
                 raise
             wait_match = re.search(r"try again in\s+(\d+)\s*s", message, flags=re.IGNORECASE)
-            wait_seconds = int(wait_match.group(1)) + 1 if wait_match else 15 * (attempt + 1)
-            time.sleep(min(max(wait_seconds, 5), 60))
+            wait_seconds = int(wait_match.group(1)) + 3 if wait_match else 20 * (attempt + 1)
+            time.sleep(min(max(wait_seconds, 10), 90))
+            # Keep the source prompt intact, but progressively reduce the answer
+            # budget so TPM-limited requests have a better chance of fitting.
+            current_max_tokens = max(350, int(current_max_tokens * 0.55))
 
 
 def split_tender_chunks(tender_text: str, chunk_chars: int = 4800, max_chunks: int = 16) -> tuple[list[str], int]:
