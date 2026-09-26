@@ -417,7 +417,7 @@ COMPANY EVIDENCE AND SOURCES:\n{chr(10).join(evidence_parts)[:2200] or '[None pr
 
 SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 'No extraction warnings.'}
 """
-            with st.spinner("Reading tender requirements and drafting selected sections… If Groq rate-limits the request, BidForge will wait and retry once."):
+            with st.spinner("Reading tender requirements and drafting selected sections… If Groq rate-limits the request, BidForge will wait and retry with a smaller answer budget."):
                 try:
                     answer = draft_response(api_key, materials, get_memory(), chosen_sections)
                     st.session_state.bidforge_messages.append({"answer": answer, "edited_answer": answer, "sections": chosen_sections, "source_material": materials, "analysis_coverage": coverage})
@@ -428,7 +428,7 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
                 except Exception as error:
                     details = str(error)
                     if "RateLimitError" in details or "rate_limit_exceeded" in details:
-                        st.warning("Groq is temporarily at its token-per-minute limit. BidForge waited and retried once, but the request still exceeded the current allowance. Wait briefly and try again with fewer sections selected.")
+                        st.warning("Groq's token-per-minute limit is still active after the adaptive retries. Wait for the limit window to reset, then try fewer sections or a shorter tender excerpt. If a shortened draft is returned, review it for missing selected sections.")
                     else:
                         st.error("AI service connection issue. BidForge could not complete this draft. Check Groq configuration and retry.")
                     with st.expander("Technical details"):
