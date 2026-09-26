@@ -108,7 +108,7 @@ st.markdown(
 
 for key, default in {
     "bidforge_memory": [], "bidforge_messages": [], "bidforge_evidence": [],
-    "bidforge_compliance": None, "bidforge_compliance_text": "", "bidforge_pricing": pd.DataFrame(columns=["Resource", "Unit", "Rate", "Currency"]),
+    "bidforge_compliance": None, "bidforge_compliance_text": "", "bidforge_compliance_fallback": False, "bidforge_pricing": pd.DataFrame(columns=["Resource", "Unit", "Rate", "Currency"]),
     "bidforge_compliance_editing": False,
 }.items():
     if key not in st.session_state:
@@ -175,7 +175,59 @@ def extract_compliance_table(markdown: str) -> pd.DataFrame:
             output: next((values[alias] for alias in alias_list if alias in values), "")
             for output, alias_list in aliases.items()
         })
-    return pd.DataFrame(mapped, columns=columns)
+    frame = pd.DataFrame(mapped, columns=columns)
+    # Treat common model placeholders as missing values so the caller can use
+    # the source-based fallback instead of displaying a matrix of "None".
+    frame = frame.replace(r"(?i)^\s*(none|null|n/?a|-)\s*$", "", regex=True)
+    return frame
+
+
+def build_source_compliance_matrix(tender_text: str) -> pd.DataFrame:
+    """Create a review-only compliance register from tender lines if AI table parsing fails."""
+    columns = ["Requirement", "Tender source", "Tender excerpt", "Company evidence", "Status", "Response", "Reviewer notes", "Owner"]
+    requirement_terms = (
+        "must", "shall", "required", "mandatory", "submit", "provide", "include", "closing date",
+        "deadline", "bid security", "bid bond", "evaluation", "pricing", "tax", "certificate",
+        "cv of", "curriculum vitae", "client reference", "comparable project", "implementation schedule",
+        "technical response", "cover letter", "insurance", "data protection", "backup", "audit logging",
+    )
+    rows, source_marker = [], "[SOURCE NOT IDENTIFIED]"
+    seen = set()
+    for raw_line in tender_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("[SOURCE:"):
+            source_marker = line.strip("[]")
+            continue
+        candidate = re.sub(r"^(?:[-*•]|\d+[.)])\s*", "", line).strip()
+        if len(candidate) < 8 or not any(term in candidate.lower() for term in requirement_terms):
+            continue
+        normalized = candidate.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        rows.append({
+            "Requirement": candidate[:500],
+            "Tender source": source_marker,
+            "Tender excerpt": candidate[:700],
+            "Company evidence": "[TO BE PROVIDED / verify]",
+            "Status": "Needs review",
+            "Response": "Verify against the tender and provide evidence/action",
+            "Reviewer notes": "Locally extracted candidate; confirm meaning and mandatory status in the original",
+            "Owner": "[TO BE ASSIGNED]",
+        })
+        if len(rows) >= 80:
+            break
+    return pd.DataFrame(rows, columns=columns)
+
+
+def compliance_matrix_is_usable(matrix: pd.DataFrame) -> bool:
+    if matrix.empty or "Requirement" not in matrix:
+        return False
+    values = matrix["Requirement"].fillna("").astype(str).str.strip()
+    valid = values[~values.str.fullmatch(r"(?i)(none|null|n/?a|-)?")]
+    return len(valid) >= max(1, int(len(matrix) * 0.4))
 
 
 def metric_card(label: str, value: str, note: str) -> None:
@@ -422,7 +474,10 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
                     answer = draft_response(api_key, materials, get_memory(), chosen_sections)
                     st.session_state.bidforge_messages.append({"answer": answer, "edited_answer": answer, "sections": chosen_sections, "source_material": materials, "analysis_coverage": coverage})
                     st.session_state.bidforge_compliance_text = extract_markdown_section(answer, "compliance")
-                    st.session_state.bidforge_compliance = extract_compliance_table(answer)
+                    parsed_matrix = extract_compliance_table(answer)
+                    use_source_fallback = not compliance_matrix_is_usable(parsed_matrix)
+                    st.session_state.bidforge_compliance = build_source_compliance_matrix(tender_text) if use_source_fallback else parsed_matrix
+                    st.session_state.bidforge_compliance_fallback = use_source_fallback and not st.session_state.bidforge_compliance.empty
                     add_to_memory("A response draft was generated. Verify claims and all placeholders against original tender sources.")
                     st.success("Draft ready for review.")
                 except Exception as error:
@@ -455,8 +510,16 @@ SOURCE EXTRACTION NOTES:\n{chr(10).join(tender_warnings + evidence_warnings) or 
 
 with tabs[4]:
     st.markdown('<div class="bf-section">Compliance Matrix</div><div class="bf-sub">Trace requirements to their source and record the evidence or action needed.</div>', unsafe_allow_html=True)
+    saved_matrix = st.session_state.bidforge_compliance
+    if isinstance(saved_matrix, pd.DataFrame) and not compliance_matrix_is_usable(saved_matrix):
+        repaired_matrix = build_source_compliance_matrix(tender_text)
+        if not repaired_matrix.empty:
+            st.session_state.bidforge_compliance = repaired_matrix
+            st.session_state.bidforge_compliance_fallback = True
     if st.session_state.bidforge_compliance is not None and not st.session_state.bidforge_compliance.empty:
         matrix = st.session_state.bidforge_compliance.copy()
+        if st.session_state.get("bidforge_compliance_fallback"):
+            st.warning("The AI checklist table was blank or incomplete. These rows were extracted from requirement-bearing tender lines as review candidates; verify each item and its mandatory status against the original tender.")
         if "Mandatory" not in matrix.columns:
             matrix.insert(1, "Mandatory", "Needs review")
         if "Company evidence" not in matrix.columns:
