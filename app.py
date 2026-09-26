@@ -17,7 +17,17 @@ if sys.version_info >= (3, 14):
     st.error("Please redeploy BidForge AI using Python 3.12 in Streamlit Community Cloud.")
     st.stop()
 
-from bidforge.agent import analyze_long_tender, audit_draft_claims, draft_response
+try:
+    from bidforge.agent import analyze_long_tender, audit_draft_claims, draft_response
+except ImportError as import_error:
+    st.error(
+        "BidForge could not import its agent module. Update app.py and bidforge/agent.py "
+        "together in GitHub. If Import details names a missing package or CrewAI symbol, "
+        "also update requirements.txt and let Streamlit Cloud reinstall dependencies."
+    )
+    with st.expander("Import details"):
+        st.code(str(import_error))
+    st.stop()
 from bidforge.document_reader import read_uploaded_file
 from bidforge.exports import to_docx, to_pdf
 from bidforge.memory import add_to_memory, get_memory, reset_memory
