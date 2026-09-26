@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import html
 
 import pandas as pd
 import streamlit as st
@@ -22,9 +23,9 @@ st.markdown(
     """
     <style>
       :root { --bf-blue:#2563eb; --bf-blue-dark:#1d4ed8; --bf-teal:#0f766e; --bf-ink:#111827; --bf-muted:#64748b; --bf-line:#e2e8f0; --bf-bg:#f6f8fc; }
-      .stApp { background: radial-gradient(ellipse at 8% 0%, rgba(37,99,235,.055), transparent 34%), radial-gradient(ellipse at 92% 9%, rgba(15,118,110,.045), transparent 26%), #f7f9fc; color:var(--bf-ink); }
+      .stApp { background: radial-gradient(ellipse at 7% 1%, rgba(37,99,235,.10), transparent 32%), radial-gradient(ellipse at 94% 8%, rgba(15,118,110,.075), transparent 25%), radial-gradient(ellipse at 50% 100%, rgba(99,102,241,.045), transparent 38%), linear-gradient(135deg,#f9fbff 0%,#f3f7fc 52%,#f7fbfa 100%); background-attachment:fixed; color:var(--bf-ink); }
       html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] { color:#111827 !important; color-scheme:light !important; }
-      .block-container { max-width: 1440px; padding-top: 1.1rem; padding-bottom: 3rem; }
+      .block-container { max-width: 1440px; padding-top: 1.1rem; padding-bottom: 3rem; position:relative; }
       [data-testid="stHeader"] { background:rgba(247,249,252,.85); }
       [data-testid="stSidebar"] { background:#fff; border-right:1px solid var(--bf-line); }
       [data-testid="stTabs"] button { font-weight:600; color:#475569 !important; opacity:1 !important; }
@@ -44,7 +45,7 @@ st.markdown(
       .bf-brand { display:flex; align-items:center; gap:.7rem; color:var(--bf-ink); font-size:1.13rem; font-weight:750; letter-spacing:-.02em; }
       .bf-mark { display:grid; place-items:center; width:38px; height:38px; border-radius:11px; background:#eaf1ff; color:var(--bf-blue-dark); border:1px solid #d7e4ff; font-size:.8rem; font-weight:800; }
       .bf-state { color:#475569; background:#fff; border:1px solid var(--bf-line); padding:.4rem .7rem; border-radius:999px; font-size:.78rem; }
-      .bf-hero { background:linear-gradient(110deg,#fff 0%,#f5f8ff 70%,#f2fbfa 100%); border:1px solid #dfe7f2; border-radius:18px; padding:1.65rem 1.8rem; box-shadow:0 5px 18px rgba(15,23,42,.035); }
+      .bf-hero { background:linear-gradient(112deg,rgba(255,255,255,.97) 0%,rgba(245,248,255,.96) 66%,rgba(239,250,248,.96) 100%); border:1px solid #dce6f3; border-radius:20px; padding:1.8rem 2rem; box-shadow:0 12px 32px rgba(30,64,110,.065); }
       .bf-eyebrow { color:var(--bf-blue-dark); text-transform:uppercase; letter-spacing:.09em; font-weight:750; font-size:.72rem; }
       .bf-hero h1 { margin:.35rem 0 .45rem; font-size:2.05rem; line-height:1.2; letter-spacing:-.04em; color:var(--bf-ink); }
       .bf-hero p { color:#526174; max-width:760px; margin:0; font-size:1rem; }
@@ -67,6 +68,14 @@ st.markdown(
       div[data-testid="stButton"] button { border-radius:9px; }
       div[data-testid="stFileUploader"] section { background:#fff !important; color:#334155 !important; border:1px dashed #b9c8dc; border-radius:12px; }
       [data-testid="stDataEditor"] { border:1px solid var(--bf-line); border-radius:10px; overflow:hidden; }
+      [data-testid="stMarkdownContainer"] table { width:100%; border-collapse:collapse; table-layout:auto; font-size:.88rem; background:#fff; border:1px solid #dce4ef; border-radius:10px; overflow:hidden; }
+      [data-testid="stMarkdownContainer"] th { background:#edf3fc; color:#172554; font-weight:700; text-align:left; }
+      [data-testid="stMarkdownContainer"] th, [data-testid="stMarkdownContainer"] td { padding:.58rem .68rem; border:1px solid #dce4ef; vertical-align:top; overflow-wrap:anywhere; }
+      [data-testid="stMarkdownContainer"] tr:nth-child(even) td { background:#f8faff; }
+      [data-testid="stMarkdownContainer"] li { margin:.22rem 0; line-height:1.55; }
+      [data-testid="stMarkdownContainer"] h1, [data-testid="stMarkdownContainer"] h2, [data-testid="stMarkdownContainer"] h3 { color:#172554; letter-spacing:-.02em; }
+      [data-testid="stExpander"] { background:rgba(255,255,255,.86); border:1px solid #e1e8f1; border-radius:12px; }
+      .bf-source-preview { white-space:pre-wrap; overflow-wrap:anywhere; max-height:430px; overflow:auto; padding:1rem 1.1rem; background:#fff; border:1px solid #dce4ef; border-radius:12px; color:#334155; font-family:Inter,Manrope,Arial,sans-serif; font-size:.88rem; line-height:1.62; box-shadow:0 3px 12px rgba(15,23,42,.025); }
       @media(max-width:760px) { .bf-hero h1 {font-size:1.6rem;} .block-container {padding-left:1rem;padding-right:1rem;} }
     </style>
     <div class="bf-topbar"><div class="bf-brand"><div class="bf-mark">BF</div><span>BidForge AI</span></div><div class="bf-state">● Session active &nbsp;·&nbsp; Groq / GPT-OSS-120B</div></div>
@@ -126,6 +135,11 @@ def extract_compliance_table(markdown: str) -> pd.DataFrame:
 
 def metric_card(label: str, value: str, note: str) -> None:
     st.markdown(f'<div class="bf-card"><div class="bf-card-label">{label}</div><div class="bf-card-value">{value}</div><div class="bf-card-note">{note}</div></div>', unsafe_allow_html=True)
+
+
+def render_source_preview(text: str, limit: int = 25000) -> None:
+    shown = text[:limit] if text else "No source text available."
+    st.markdown(f'<div class="bf-source-preview">{html.escape(shown)}</div>', unsafe_allow_html=True)
 
 
 def compact_tender_excerpt(text: str, limit: int = 7600) -> str:
@@ -212,7 +226,7 @@ with tabs[1]:
     st.session_state.source_tender_text = tender_text
     with st.expander("Preview extracted tender source", expanded=bool(tender_text)):
         st.markdown('<span class="bf-source">SOURCE EVIDENCE</span>', unsafe_allow_html=True)
-        st.text(tender_text[:30000] if tender_text else "Add a tender source to preview its extracted text.")
+        render_source_preview(tender_text[:30000] if tender_text else "Add a tender source to preview its extracted text.", limit=30000)
         for warning in tender_warnings:
             st.warning(warning)
 
@@ -287,7 +301,7 @@ with tabs[2]:
             st.rerun()
     with st.expander("Preview extracted company evidence"):
         st.markdown('<span class="bf-source">SOURCE EVIDENCE</span>', unsafe_allow_html=True)
-        st.text("\n\n".join(evidence_parts)[:20000] or "No uploaded or linked company source text yet.")
+        render_source_preview("\n\n".join(evidence_parts) or "No uploaded or linked company source text yet.", limit=20000)
         for warning in evidence_warnings:
             st.warning(warning)
 
@@ -413,7 +427,7 @@ with tabs[4]:
             with csv_col:
                 st.download_button("Export edited table (CSV)", edited.to_csv(index=False), file_name="bidforge_compliance_matrix.csv", mime="text/csv", key="matrix_csv_edit")
         with st.expander("Source evidence and extracted tender text"):
-            st.text(tender_text[:25000] or "Tender text is not available in this session.")
+            render_source_preview(tender_text or "Tender text is not available in this session.", limit=25000)
     else:
         st.info("No compliance rows are available yet. Go to Bid Builder, select **Compliance checklist**, and generate a draft. The edit button will appear here once requirements are extracted.")
 
@@ -434,8 +448,15 @@ with tabs[5]:
         with st.expander("Preview draft", expanded=index == 1):
             st.markdown('<span class="bf-ai">AI DRAFT</span> &nbsp; <span class="bf-review-badge">NEEDS REVIEW</span>' + (' &nbsp; <span class="bf-user">USER EDITED</span>' if is_edited else ''), unsafe_allow_html=True)
             if is_editing:
-                st.caption("Edit the response text below. Markdown headings and lists can be retained. Your changes are saved for this browser session.")
-                edited_text = st.text_area("Edit response draft", value=saved_text, height=520, key=f"draft_editor_{draft_id}", label_visibility="collapsed")
+                st.caption("Edit the text on the left and check its formatted preview on the right. Use Markdown headings, lists, and pipe tables. Save when you are satisfied.")
+                editor_col, preview_col = st.columns([1, 1], gap="large")
+                with editor_col:
+                    edited_text = st.text_area("Draft text (Markdown)", value=saved_text, height=560, key=f"draft_editor_{draft_id}")
+                with preview_col:
+                    st.markdown("**Formatted preview**")
+                    with st.container(border=True):
+                        st.markdown(edited_text)
+                st.caption("Your changes are saved for this browser session. DOCX and PDF exports convert Markdown tables into aligned document tables.")
                 save_col, cancel_col, restore_col = st.columns(3)
                 with save_col:
                     if st.button("Save edits", type="primary", key=f"save_draft_{draft_id}"):
