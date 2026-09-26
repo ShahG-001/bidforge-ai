@@ -115,9 +115,10 @@ def extract_markdown_section(markdown: str, word: str) -> str:
 
 def extract_compliance_table(markdown: str) -> pd.DataFrame:
     markdown = extract_markdown_section(markdown, "compliance")
+    columns = ["Requirement", "Tender source", "Tender excerpt", "Company evidence", "Status", "Response", "Reviewer notes", "Owner"]
     if not markdown:
-        return pd.DataFrame(columns=["Requirement", "Source", "Status", "Evidence / next action", "Owner"])
-    rows, in_table = [], False
+        return pd.DataFrame(columns=columns)
+    rows, headers, in_table = [], [], False
     for line in markdown.splitlines():
         if line.strip().startswith("|"):
             cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
@@ -125,12 +126,33 @@ def extract_compliance_table(markdown: str) -> pd.DataFrame:
                 continue
             if not in_table:
                 in_table = True
+                headers = cells
                 continue
             if len(cells) >= 4:
-                rows.append((cells + [""] * 5)[:5])
+                rows.append(cells)
         elif in_table:
             break
-    return pd.DataFrame(rows, columns=["Requirement", "Source", "Status", "Evidence / next action", "Owner"])
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    normalized_headers = [header.lower().strip() for header in headers]
+    aliases = {
+        "requirement": ("requirement", "mandatory requirement"),
+        "tender source": ("tender source (file/page/section)", "tender source", "source"),
+        "tender excerpt": ("tender excerpt", "exact tender evidence", "tender evidence"),
+        "company evidence": ("company evidence source (file/page/link or missing)", "company evidence source", "company evidence", "evidence source"),
+        "status": ("status", "compliance status"),
+        "response": ("response/action", "response / action", "response", "evidence / next action"),
+        "reviewer notes": ("reviewer notes", "review notes", "notes"),
+        "owner": ("owner", "review owner"),
+    }
+    mapped = []
+    for row in rows:
+        values = dict(zip(normalized_headers, row))
+        mapped.append({
+            output: next((values[alias] for alias in alias_list if alias in values), "")
+            for output, alias_list in aliases.items()
+        })
+    return pd.DataFrame(mapped, columns=columns)
 
 
 def metric_card(label: str, value: str, note: str) -> None:
@@ -149,13 +171,17 @@ def compact_tender_excerpt(text: str, limit: int = 7600) -> str:
     terms = ("deadline", "closing date", "submission", "eligibility", "evaluation", "scope", "deliverable", "mandatory", "bid security", "financial", "pricing", "technical", "clarification", "page limit", "penalty", "liability", "contract", "warranty", "key date")
     selected = [text[:1700], "[Tender source excerpted to fit the model request budget]"]
     used = sum(map(len, selected))
+    last_source = ""
     for line in text.splitlines():
+        if "[SOURCE:" in line:
+            last_source = line.strip()
         if any(term in line.lower() for term in terms):
-            item = line.strip()[:260]
+            item = f"{last_source}\n{line.strip()[:240]}" if last_source else line.strip()[:260]
             if item and item not in selected and used + len(item) + 1 < limit - 1200:
                 selected.append(item)
                 used += len(item) + 1
-    selected.append("[End of tender excerpt]\n" + text[-1000:])
+    tail_source = next((line.strip() for line in reversed(text.splitlines()) if "[SOURCE:" in line), "")
+    selected.append("[End of tender excerpt]\n" + (tail_source + "\n" if tail_source else "") + text[-1000:])
     return "\n".join(selected)
 
 
@@ -426,6 +452,21 @@ with tabs[4]:
                     st.rerun()
             with csv_col:
                 st.download_button("Export edited table (CSV)", edited.to_csv(index=False), file_name="bidforge_compliance_matrix.csv", mime="text/csv", key="matrix_csv_edit")
+        if len(matrix):
+            with st.expander("Inspect source and company evidence for a requirement"):
+                selected_row = st.selectbox(
+                    "Choose a requirement",
+                    options=list(range(len(matrix))),
+                    format_func=lambda row_index: f"{row_index + 1}. {str(matrix.iloc[row_index].get('Requirement', 'Requirement'))[:110]}",
+                    key="compliance_source_row",
+                )
+                detail = matrix.iloc[selected_row]
+                st.markdown("**Tender reference**")
+                st.write(detail.get("Tender source", "[SOURCE NOT IDENTIFIED]") or "[SOURCE NOT IDENTIFIED]")
+                st.markdown("**Tender excerpt**")
+                render_source_preview(str(detail.get("Tender excerpt", "") or "No excerpt was returned."), limit=3500)
+                st.markdown("**Company evidence reference**")
+                st.write(detail.get("Company evidence", "[TO BE PROVIDED]") or "[TO BE PROVIDED]")
         with st.expander("Source evidence and extracted tender text"):
             render_source_preview(tender_text or "Tender text is not available in this session.", limit=25000)
     else:
