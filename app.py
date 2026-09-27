@@ -519,7 +519,7 @@ with tabs[4]:
     if st.session_state.bidforge_compliance is not None and not st.session_state.bidforge_compliance.empty:
         matrix = st.session_state.bidforge_compliance.copy()
         if st.session_state.get("bidforge_compliance_fallback"):
-            st.warning("The AI checklist table was blank or incomplete. These rows were extracted from requirement-bearing tender lines as review candidates; verify each item and its mandatory status against the original tender.")
+            st.info("Source-derived checklist candidates are shown because the AI table could not be read reliably. This is not an app error. Check each candidate and confirm whether it is mandatory in the original tender.")
         if "Mandatory" not in matrix.columns:
             matrix.insert(1, "Mandatory", "Needs review")
         if "Company evidence" not in matrix.columns:
